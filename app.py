@@ -1,11 +1,14 @@
-from flask import Flask, render_template, request, send_from_directory
+from flask import Flask, render_template, request, send_from_directory, flash
 import os
 import cv2
+import traceback
 from realesrgan import RealESRGANer
 from basicsr.archs.srvgg_arch import SRVGGNetCompact
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+app.secret_key = "supersecretkey"  
+app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024  # 30MB
 
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
@@ -13,27 +16,29 @@ OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
-# Load model 1 lần duy nhất
-def create_upsampler():
-    model = SRVGGNetCompact(
-        num_in_ch=3,
-        num_out_ch=3,
-        num_feat=64,
-        num_conv=32,
-        upscale=4,
-        act_type='prelu'
-    )
-    return RealESRGANer(
-        scale=4,
-        model_path='realesr-general-x4v3.pth',
-        model=model,
-        tile=128,
-        tile_pad=10,
-        pre_pad=0,
-        half=False
-    )
-
-upsampler = create_upsampler()
+# Lazy-load model
+upsampler = None
+def get_upsampler():
+    global upsampler
+    if upsampler is None:
+        model = SRVGGNetCompact(
+            num_in_ch=3,
+            num_out_ch=3,
+            num_feat=64,
+            num_conv=32,
+            upscale=4,
+            act_type='prelu'
+        )
+        upsampler = RealESRGANer(
+            scale=4,
+            model_path='realesr-general-x4v3.pth',
+            model=model,
+            tile=64,       
+            tile_pad=10,
+            pre_pad=0,
+            half=False     
+        )
+    return upsampler
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -41,26 +46,42 @@ def index():
     output_file = None
 
     if request.method == 'POST':
-        file = request.files['image']
-        if file:
-            filename = secure_filename(file.filename)
+        try:
+            file = request.files['image']
+            if file:
+                filename = secure_filename(file.filename)
 
-            input_path = os.path.join(UPLOAD_FOLDER, filename)
-            output_filename = "output_" + filename
-            output_path = os.path.join(OUTPUT_FOLDER, output_filename)
+                input_path = os.path.join(UPLOAD_FOLDER, filename)
+                output_filename = "output_" + filename
+                output_path = os.path.join(OUTPUT_FOLDER, output_filename)
 
-            file.save(input_path)
+                file.save(input_path)
 
-            # đọc ảnh
-            img = cv2.imread(input_path)
+                img = cv2.imread(input_path)
+                if img is None:
+                    flash("Không thể đọc ảnh. Vui lòng thử lại.")
+                    return render_template('index.html')
 
-            # upscale
-            output, _ = upsampler.enhance(img, outscale=4)
+                h, w = img.shape[:2]
+                max_size = 800
+                if max(h, w) > max_size:
+                    scale = max_size / max(h, w)
+                    img = cv2.resize(img, (int(w*scale), int(h*scale)))
 
-            cv2.imwrite(output_path, output)
+                upsampler_model = get_upsampler()
+                output, _ = upsampler_model.enhance(img, outscale=4)
 
-            input_file = filename
-            output_file = output_filename
+                cv2.imwrite(output_path, output)
+
+                # os.remove(input_path)
+
+                input_file = filename
+                output_file = output_filename
+
+        except Exception as e:
+            print("ERROR:", e)
+            traceback.print_exc()
+            flash("Có lỗi xảy ra khi xử lý ảnh. Vui lòng thử lại!")
 
     return render_template(
         'index.html',
@@ -68,7 +89,6 @@ def index():
         output_file=output_file
     )
 
-# route hiển thị ảnh
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
@@ -77,8 +97,6 @@ def uploaded_file(filename):
 def output_file(filename):
     return send_from_directory(OUTPUT_FOLDER, filename)
 
-# if __name__ == '__main__':
-#     app.run(debug=True)
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
