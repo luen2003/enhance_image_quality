@@ -11,9 +11,10 @@ COPY . .
 
 RUN pip install --upgrade pip setuptools wheel
 
-RUN pip install flask \
+RUN pip install \
+    flask \
     opencv-python-headless \
-    numpy \
+    "numpy<2" \
     pillow \
     torch==2.1.0 \
     torchvision==0.16.0 \
