@@ -1,4 +1,4 @@
 # Setup
-```pip install flask opencv-python realesrgan basicsr torch torchvision numpy pillow```
+`pip install flask opencv-python realesrgan basicsr torch torchvision numpy pillow`
 # Run
-```python app.py```
+`python app.py`
