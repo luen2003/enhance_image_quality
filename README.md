@@ -1,6 +1,8 @@
 ## Setup
-`pip install flask opencv-python realesrgan basicsr torch torchvision numpy pillow`
-`pip install -r requirements.txt`
+```
+pip install flask opencv-python realesrgan basicsr torch torchvision numpy pillow
+pip install -r requirements.txt
+```
 ## Run
 `python app.py`
 ## Build Docker Image
