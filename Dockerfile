@@ -11,7 +11,14 @@ COPY . .
 
 RUN pip install --upgrade pip setuptools wheel
 
-RUN pip install -r requirements.txt
+RUN pip install flask \
+    opencv-python-headless \
+    numpy \
+    pillow \
+    torch==2.1.0 \
+    torchvision==0.16.0 \
+    basicsr==1.4.2 \
+    realesrgan==0.3.0
 
 EXPOSE 5000
 
