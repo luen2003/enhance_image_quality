@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_from_directory, flash
+from flask import Flask, render_template, request, send_from_directory, flash, redirect, url_for
 import os
 import cv2
 import traceback
@@ -7,8 +7,8 @@ from basicsr.archs.srvgg_arch import SRVGGNetCompact
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  
-app.config['MAX_CONTENT_LENGTH'] = 30 * 1024 * 1024  # 30MB
+app.secret_key = "supersecretkey"
+app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024
 
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
@@ -16,7 +16,13 @@ OUTPUT_FOLDER = 'outputs'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
+@app.errorhandler(413)
+def too_large(e):
+    flash("File quá lớn! Vui lòng chọn ảnh dưới 20MB.")
+    return redirect(url_for('index'))
+
 upsampler = None
+
 def get_upsampler():
     global upsampler
     if upsampler is None:
@@ -32,10 +38,10 @@ def get_upsampler():
             scale=4,
             model_path='realesr-general-x4v3.pth',
             model=model,
-            tile=128,       
+            tile=128,
             tile_pad=10,
             pre_pad=0,
-            half=False     
+            half=False
         )
     return upsampler
 
@@ -46,41 +52,45 @@ def index():
 
     if request.method == 'POST':
         try:
+            if 'image' not in request.files:
+                return redirect(url_for('index'))
+
             file = request.files['image']
-            if file:
-                filename = secure_filename(file.filename)
+            if file.filename == '':
+                return redirect(url_for('index'))
 
-                input_path = os.path.join(UPLOAD_FOLDER, filename)
-                output_filename = "output_" + filename
-                output_path = os.path.join(OUTPUT_FOLDER, output_filename)
+            filename = secure_filename(file.filename)
 
-                file.save(input_path)
+            input_path = os.path.join(UPLOAD_FOLDER, filename)
+            output_filename = "output_" + filename
+            output_path = os.path.join(OUTPUT_FOLDER, output_filename)
 
-                img = cv2.imread(input_path)
-                if img is None:
-                    flash("Không thể đọc ảnh. Vui lòng thử lại.")
-                    return render_template('index.html')
+            file.save(input_path)
 
-                h, w = img.shape[:2]
-                max_size = 800
-                if max(h, w) > max_size:
-                    scale = max_size / max(h, w)
-                    img = cv2.resize(img, (int(w*scale), int(h*scale)))
+            img = cv2.imread(input_path)
+            if img is None:
+                flash("Không thể đọc ảnh. Vui lòng thử lại.")
+                return redirect(url_for('index'))
 
-                upsampler_model = get_upsampler()
-                output, _ = upsampler_model.enhance(img, outscale=4)
+            h, w = img.shape[:2]
+            max_size = 800
+            if max(h, w) > max_size:
+                scale = max_size / max(h, w)
+                img = cv2.resize(img, (int(w * scale), int(h * scale)))
 
-                cv2.imwrite(output_path, output)
+            upsampler_model = get_upsampler()
+            output, _ = upsampler_model.enhance(img, outscale=4)
 
-                # os.remove(input_path)
+            cv2.imwrite(output_path, output)
 
-                input_file = filename
-                output_file = output_filename
+            input_file = filename
+            output_file = output_filename
 
         except Exception as e:
             print("ERROR:", e)
             traceback.print_exc()
             flash("Có lỗi xảy ra khi xử lý ảnh. Vui lòng thử lại!")
+            return redirect(url_for('index'))
 
     return render_template(
         'index.html',

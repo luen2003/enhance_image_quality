@@ -42,7 +42,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 10px;
             margin-bottom: 20px;
         }
 
@@ -108,9 +108,13 @@
         .file-info {
             font-size: 14px;
             color: #48bb78;
-            /* Màu xanh lá cây */
             font-weight: 600;
             margin-top: 10px;
+        }
+
+        .error {
+            color: red;
+            font-weight: 600;
         }
 
         .loading {
@@ -118,7 +122,6 @@
             display: none;
             font-weight: bold;
             color: #667eea;
-            /* Đã loại bỏ animation pulse */
         }
 
         .images {
@@ -165,7 +168,15 @@
     <div class="container">
         <h1>✨ AI Image Enhancer</h1>
 
-        <form method="POST" enctype="multipart/form-data" onsubmit="showLoading()">
+        {% with messages = get_flashed_messages() %}
+        {% if messages %}
+        {% for message in messages %}
+        <div class="error">{{ message }}</div>
+        {% endfor %}
+        {% endif %}
+        {% endwith %}
+
+        <form method="POST" enctype="multipart/form-data" onsubmit="return validateForm()">
             <div class="action-group">
                 <label class="btn-ui upload-label">
                     📁 Chọn ảnh từ máy
@@ -178,13 +189,14 @@
                 </div>
 
                 <button type="submit" class="btn-ui enhance-btn">🚀 Nâng cấp ảnh</button>
+
+                <div id="error" class="error"></div>
             </div>
 
             <div class="loading" id="loading">
                 Đang xử lý... Vui lòng đợi trong giây lát
             </div>
         </form>
-
         {% if input_file and output_file %}
         <hr style="border: 0; border-top: 1px solid #eee; margin: 40px 0;">
         <div class="images">
@@ -206,28 +218,48 @@
     </div>
 
     <script>
-        function showLoading() {
+        function validateForm() {
             const input = document.getElementById('imageInput');
+            const errorDiv = document.getElementById('error');
+
             if (input.files.length > 0) {
+                const file = input.files[0];
+                if (file.size > 20 * 1024 * 1024) {
+                    errorDiv.innerText = "File quá lớn! Vui lòng chọn ảnh dưới 20MB.";
+                    return false;
+                }
                 document.getElementById("loading").style.display = "block";
             }
+            return true;
         }
 
         function handleFileSelect(input) {
             const previewContainer = document.getElementById('preview-container');
             const previewImg = document.getElementById('preview-img');
             const fileNameDisplay = document.getElementById('file-name');
+            const errorDiv = document.getElementById('error');
 
             if (input.files && input.files[0]) {
+                const file = input.files[0];
+
+                if (file.size > 20 * 1024 * 1024) {
+                    errorDiv.innerText = "File quá lớn! Vui lòng chọn ảnh dưới 20MB.";
+                    input.value = "";
+                    previewContainer.style.display = "none";
+                    return;
+                } else {
+                    errorDiv.innerText = "";
+                }
+
                 const reader = new FileReader();
 
                 reader.onload = function (e) {
                     previewImg.src = e.target.result;
                     previewContainer.style.display = "block";
-                    fileNameDisplay.innerText = "Tệp đã chọn: " + input.files[0].name;
+                    fileNameDisplay.innerText = "Tệp đã chọn: " + file.name;
                 }
 
-                reader.readAsDataURL(input.files[0]);
+                reader.readAsDataURL(file);
             }
         }
     </script>
