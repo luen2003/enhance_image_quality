@@ -7,7 +7,7 @@ from basicsr.archs.srvgg_arch import SRVGGNetCompact
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"  
+app.secret_key = "enhance_image_quality"  
 app.config['MAX_CONTENT_LENGTH'] = 20 * 1024 * 1024  # 20MB
 
 UPLOAD_FOLDER = 'uploads'
@@ -32,7 +32,7 @@ def get_upsampler():
             scale=4,
             model_path='realesr-general-x4v3.pth',
             model=model,
-            tile=64,       
+            tile=128,       
             tile_pad=10,
             pre_pad=0,
             half=False     
