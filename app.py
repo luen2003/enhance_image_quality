@@ -32,7 +32,7 @@ def get_upsampler():
             scale=4,
             model_path='realesr-general-x4v3.pth',
             model=model,
-            tile=64,       
+            tile=128,       
             tile_pad=10,
             pre_pad=0,
             half=False     
